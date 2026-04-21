@@ -32,6 +32,38 @@ function App() {
   const { currentMessage, visibleCount, phase } = useLedTypewriter(LED_MESSAGES);
   const ledDots = buildLedDots(currentMessage, visibleCount, phase);
   const [isEnvelopeOpen, setIsEnvelopeOpen] = useState(false);
+  const [isCandleBlown, setIsCandleBlown] = useState(false);
+  const [closeNotice, setCloseNotice] = useState("");
+
+  const handleEnvelopeOpen = () => {
+    setIsEnvelopeOpen(true);
+    setIsCandleBlown(false);
+    setCloseNotice("");
+  };
+
+  const handleEnvelopeClose = () => {
+    if (!isCandleBlown) {
+      setCloseNotice("Silakan tiup lilinnya dulu");
+      return;
+    }
+
+    setIsEnvelopeOpen(false);
+    setCloseNotice("");
+  };
+
+  const handleBlowCandle = () => {
+    setIsCandleBlown(true);
+    setCloseNotice("");
+  };
+
+  useEffect(() => {
+    if (!closeNotice) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setCloseNotice(""), 2400);
+    return () => window.clearTimeout(timeoutId);
+  }, [closeNotice]);
 
   useEffect(() => {
     if (!isEnvelopeOpen) {
@@ -40,13 +72,14 @@ function App() {
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        setIsEnvelopeOpen(false);
+        event.preventDefault();
+        handleEnvelopeClose();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isEnvelopeOpen]);
+  }, [isCandleBlown, isEnvelopeOpen]);
 
   return (
     <main
@@ -64,8 +97,11 @@ function App() {
 
       <EnvelopeFeature
         isOpen={isEnvelopeOpen}
-        onOpen={() => setIsEnvelopeOpen(true)}
-        onClose={() => setIsEnvelopeOpen(false)}
+        isCandleBlown={isCandleBlown}
+        closeNotice={closeNotice}
+        onOpen={handleEnvelopeOpen}
+        onClose={handleEnvelopeClose}
+        onBlowCandle={handleBlowCandle}
       />
     </main>
   );
@@ -205,7 +241,7 @@ function FanDisplay({ ledDots, currentMessage }) {
   );
 }
 
-function EnvelopeFeature({ isOpen, onOpen, onClose }) {
+function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, onBlowCandle }) {
   const handleKeyDown = (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -266,13 +302,64 @@ function EnvelopeFeature({ isOpen, onOpen, onClose }) {
           {!isOpen ? <p className="envelope-hint">Tap to open</p> : null}
         </div>
 
+        <BirthdayCake isVisible={isOpen} isCandleBlown={isCandleBlown} onBlowCandle={onBlowCandle} />
+
         {isOpen ? (
           <button type="button" className="letter-close" onClick={onClose}>
             Tutup
           </button>
         ) : null}
       </div>
+
+      <div
+        className={`envelope-toast${closeNotice ? " is-visible" : ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        {closeNotice}
+      </div>
     </>
+  );
+}
+
+function BirthdayCake({ isVisible, isCandleBlown, onBlowCandle }) {
+  return (
+    <div className={`cake-stage${isVisible ? " is-visible" : ""}`} aria-hidden={!isVisible}>
+      <p className={`cake-instruction${isCandleBlown ? " is-complete" : ""}`}>
+        {isCandleBlown
+          ? "Lilin sudah padam. Sekarang boleh tutup amplop."
+          : "Tap api untuk tiup lilin"}
+      </p>
+
+      <div className="birthday-cake" aria-label="Kue ulang tahun dengan lilin menyala">
+        <div className="cake-glow" aria-hidden="true" />
+        <div className="cake-plate" aria-hidden="true" />
+
+        <div className="cake-body" aria-hidden="true">
+          <div className="cake-top-icing" />
+          <div className="cake-side-icing cake-side-icing-left" />
+          <div className="cake-side-icing cake-side-icing-center" />
+          <div className="cake-side-icing cake-side-icing-right" />
+          <div className="cake-ribbon" />
+
+          <div className="cake-candle">
+            <span className="cake-candle-stick" />
+            <span className="cake-candle-wick" />
+            <button
+              type="button"
+              className={`candle-flame${isCandleBlown ? " is-out" : ""}`}
+              aria-label={isCandleBlown ? "Lilin sudah padam" : "Tap api untuk tiup lilin"}
+              onClick={onBlowCandle}
+              disabled={isCandleBlown || !isVisible}
+              tabIndex={isVisible && !isCandleBlown ? 0 : -1}
+            >
+              <span className="candle-flame-core" aria-hidden="true" />
+              <span className="candle-smoke" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
