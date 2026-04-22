@@ -62,6 +62,7 @@ body::after {
 
 .scene {
   position: relative;
+  --content-lift: 3.4rem;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -294,6 +295,7 @@ body::after {
   position: relative;
   width: min(92vw, 40rem);
   height: min(92vh, 50rem);
+  margin-top: calc(var(--content-lift) * -1);
   display: grid;
   place-items: center;
   perspective: 1300px;
@@ -888,13 +890,97 @@ body::after {
   width: min(92vw, 29rem);
   aspect-ratio: 16 / 11;
   overflow: visible;
-  transform: translate(-50%, clamp(11.5rem, 30vh, 15.5rem)) scale(0.26);
+  transform: translate(-50%, calc(clamp(11.5rem, 30vh, 15.5rem) - var(--content-lift))) scale(0.26);
   transform-origin: center;
   transition: transform 780ms cubic-bezier(0.22, 1, 0.24, 1);
 }
 
 .envelope-stage.is-open {
-  transform: translate(-50%, calc(-50% - 2.2rem)) scale(1);
+  transform: translate(-50%, calc(-50% - 2.2rem - var(--content-lift))) scale(1);
+}
+
+.envelope-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  transition:
+    opacity 320ms ease,
+    transform 320ms ease;
+}
+
+.envelope-stage.is-open .envelope-arrows {
+  opacity: 0.16;
+  transform: scale(0.96);
+}
+
+.envelope-arrow {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  gap: 0.32rem;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 10px rgba(138, 231, 255, 0.24));
+}
+
+.envelope-arrow-left {
+  left: -3.5rem;
+}
+
+.envelope-arrow-right {
+  right: -3.5rem;
+}
+
+.envelope-arrow span {
+  position: relative;
+  width: 1.8rem;
+  height: 1.8rem;
+  opacity: 0.22;
+  color: hsl(calc(130deg + var(--arrow-hue)) 100% 72%);
+  animation: rainbow-arrow 1.3s ease-in-out infinite;
+  animation-delay: var(--arrow-delay);
+}
+
+.envelope-arrow span::before,
+.envelope-arrow span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.2rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    0 0 16px currentColor,
+    0 0 28px currentColor;
+}
+
+.envelope-arrow-left span::before,
+.envelope-arrow-left span::after {
+  right: 0.16rem;
+  transform-origin: right center;
+}
+
+.envelope-arrow-left span::before {
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.envelope-arrow-left span::after {
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+.envelope-arrow-right span::before,
+.envelope-arrow-right span::after {
+  left: 0.16rem;
+  transform-origin: left center;
+}
+
+.envelope-arrow-right span::before {
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.envelope-arrow-right span::after {
+  transform: translateY(-50%) rotate(-45deg);
 }
 
 .envelope-card {
@@ -1677,6 +1763,32 @@ body::after {
   }
 }
 
+@keyframes rainbow-arrow {
+  0% {
+    opacity: 0.14;
+    filter: hue-rotate(0deg);
+    transform: translateY(0) scale(0.8);
+  }
+
+  35% {
+    opacity: 1;
+    filter: hue-rotate(42deg);
+    transform: translateY(-0.14rem) scale(1.12);
+  }
+
+  70% {
+    opacity: 0.42;
+    filter: hue-rotate(88deg);
+    transform: translateY(0.1rem) scale(0.96);
+  }
+
+  100% {
+    opacity: 0.18;
+    filter: hue-rotate(140deg);
+    transform: translateY(0) scale(0.8);
+  }
+}
+
 @keyframes float-fan {
   0%,
   100% {
@@ -1689,6 +1801,10 @@ body::after {
 }
 
 @media (max-width: 640px) {
+  .scene {
+    --content-lift: 2.35rem;
+  }
+
   .fan-display {
     width: min(96vw, 28rem);
     height: min(88vh, 41rem);
@@ -1716,11 +1832,34 @@ body::after {
   .envelope-stage {
     --cake-offset: 7.6rem;
     width: min(94vw, 23rem);
-    transform: translate(-50%, clamp(10rem, 32vh, 13rem)) scale(0.3);
+    transform: translate(-50%, calc(clamp(10rem, 32vh, 13rem) - var(--content-lift))) scale(0.3);
   }
 
   .envelope-stage.is-open {
-    transform: translate(-50%, calc(-50% - 1.35rem)) scale(1);
+    transform: translate(-50%, calc(-50% - 1.35rem - var(--content-lift))) scale(1);
+  }
+
+  .envelope-arrow-left {
+    left: -2.2rem;
+  }
+
+  .envelope-arrow-right {
+    right: -2.2rem;
+  }
+
+  .envelope-arrow {
+    gap: 0.2rem;
+  }
+
+  .envelope-arrow span {
+    width: 1.28rem;
+    height: 1.28rem;
+  }
+
+  .envelope-arrow span::before,
+  .envelope-arrow span::after {
+    width: 0.9rem;
+    height: 0.24rem;
   }
 
   .letter-paper {

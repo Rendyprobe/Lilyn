@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LED_FONT = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -242,6 +242,8 @@ function FanDisplay({ ledDots, currentMessage }) {
 }
 
 function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, onBlowCandle }) {
+  const letterPaperRef = useRef(null);
+
   const handleKeyDown = (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -251,6 +253,58 @@ function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, 
       }
     }
   };
+
+  useEffect(() => {
+    const letterPaper = letterPaperRef.current;
+
+    if (!letterPaper) {
+      return undefined;
+    }
+
+    letterPaper.scrollTop = 0;
+
+    if (!isOpen) {
+      return undefined;
+    }
+
+    let frameId = 0;
+    let startTime;
+    const delayId = window.setTimeout(() => {
+      const maxScroll = letterPaper.scrollHeight - letterPaper.clientHeight;
+
+      if (maxScroll <= 0) {
+        return;
+      }
+
+      const duration = Math.min(4200, Math.max(1800, maxScroll * 14));
+
+      const animateScroll = (timestamp) => {
+        if (startTime === undefined) {
+          startTime = timestamp;
+        }
+
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+        letterPaper.scrollTop = maxScroll * easedProgress;
+
+        if (progress < 1) {
+          frameId = window.requestAnimationFrame(animateScroll);
+        }
+      };
+
+      frameId = window.requestAnimationFrame(animateScroll);
+    }, 1080);
+
+    return () => {
+      window.clearTimeout(delayId);
+
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isOpen]);
 
   return (
     <>
@@ -264,6 +318,26 @@ function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, 
       />
 
       <div className={`envelope-stage${isOpen ? " is-open" : ""}`}>
+        <div className="envelope-arrows" aria-hidden="true">
+          <div className="envelope-arrow envelope-arrow-left">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <span
+                key={`left-arrow-${index}`}
+                style={{ "--arrow-delay": `${index * 0.18}s`, "--arrow-hue": `${index * 72}deg` }}
+              />
+            ))}
+          </div>
+
+          <div className="envelope-arrow envelope-arrow-right">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <span
+                key={`right-arrow-${index}`}
+                style={{ "--arrow-delay": `${index * 0.18}s`, "--arrow-hue": `${index * 72 + 36}deg` }}
+              />
+            ))}
+          </div>
+        </div>
+
         <div
           className="envelope-card"
           role={isOpen ? "dialog" : "button"}
@@ -278,7 +352,7 @@ function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, 
           <div className="envelope-back-panel" aria-hidden="true" />
 
           <article className="letter-sheet" aria-label="Isi surat ucapan">
-            <div className="letter-paper">
+            <div className="letter-paper" ref={letterPaperRef}>
               <p className="letter-kicker">Special Note</p>
               <h2>Untukmu yang sedang berbahagia,</h2>
               <p>
@@ -325,11 +399,7 @@ function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, 
 function BirthdayCake({ isVisible, isCandleBlown, onBlowCandle }) {
   return (
     <div className={`cake-stage${isVisible ? " is-visible" : ""}`} aria-hidden={!isVisible}>
-      <p className={`cake-instruction${isCandleBlown ? " is-complete" : ""}`}>
-        {isCandleBlown
-          ? "Lilin sudah padam. Sekarang boleh tutup amplop."
-          : "Tap api untuk tiup lilin"}
-      </p>
+      {!isCandleBlown ? <p className="cake-instruction">Tap api untuk tiup lilin</p> : null}
 
       <div className="birthday-cake" aria-label="Kue ulang tahun dengan lilin menyala">
         <div className="cake-glow" aria-hidden="true" />
