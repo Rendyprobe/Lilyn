@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const LED_FONT = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -19,6 +19,12 @@ const LED_FONT = {
 const LED_MESSAGES = ["HAPPY BIRTHDAY", "LINDA", "PUTRI", "RAHAYU"];
 const LED_GLYPH_SPACING = 2;
 const MAX_LED_COLUMNS = Math.max(...LED_MESSAGES.map(getMessageColumns));
+const BACKGROUND_MUSIC_SRC = `${import.meta.env.BASE_URL}audio/about-you.mp3`;
+const BOUQUET_REVEAL_ASSETS = [
+  { id: "left", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga kiri" },
+  { id: "center", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga tengah" },
+  { id: "right", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga kanan" },
+];
 const FIREWORKS = [
   { id: "fw-a", left: "12%", top: "18%", size: "11rem", hue: 128, delay: "0s", duration: "4.8s" },
   { id: "fw-b", left: "26%", top: "10%", size: "9rem", hue: 188, delay: "1.3s", duration: "4.2s" },
@@ -33,11 +39,13 @@ function App() {
   const ledDots = buildLedDots(currentMessage, visibleCount, phase);
   const [isEnvelopeOpen, setIsEnvelopeOpen] = useState(false);
   const [isCandleBlown, setIsCandleBlown] = useState(false);
+  const [isBouquetVisible, setIsBouquetVisible] = useState(false);
   const [closeNotice, setCloseNotice] = useState("");
 
   const handleEnvelopeOpen = () => {
     setIsEnvelopeOpen(true);
     setIsCandleBlown(false);
+    setIsBouquetVisible(false);
     setCloseNotice("");
   };
 
@@ -48,6 +56,7 @@ function App() {
     }
 
     setIsEnvelopeOpen(false);
+    setIsBouquetVisible(true);
     setCloseNotice("");
   };
 
@@ -103,7 +112,138 @@ function App() {
         onClose={handleEnvelopeClose}
         onBlowCandle={handleBlowCandle}
       />
+      <BouquetReveal isVisible={isBouquetVisible && !isEnvelopeOpen} />
+      <BackgroundMusic />
     </main>
+  );
+}
+
+function BackgroundMusic() {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasAudioError, setHasAudioError] = useState(false);
+  const [shouldShowFallback, setShouldShowFallback] = useState(false);
+
+  const startMusic = useCallback(async () => {
+    const audio = audioRef.current;
+
+    if (!audio || hasAudioError) {
+      return;
+    }
+
+    audio.volume = 0.54;
+
+    try {
+      await audio.play();
+      setIsPlaying(true);
+      setShouldShowFallback(false);
+    } catch {
+      setIsPlaying(false);
+      setShouldShowFallback(true);
+    }
+  }, [hasAudioError]);
+
+  const handleStartMusic = () => {
+    const audio = audioRef.current;
+
+    if (!audio || hasAudioError) {
+      return;
+    }
+
+    void startMusic();
+  };
+
+  useEffect(() => {
+    void startMusic();
+  }, [startMusic]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      return undefined;
+    }
+
+    const handleFirstInteraction = () => {
+      void startMusic();
+    };
+
+    const pointerOptions = { once: true, passive: true };
+    const keyOptions = { once: true };
+
+    window.addEventListener("pointerdown", handleFirstInteraction, pointerOptions);
+    window.addEventListener("touchstart", handleFirstInteraction, pointerOptions);
+    window.addEventListener("keydown", handleFirstInteraction, keyOptions);
+
+    return () => {
+      window.removeEventListener("pointerdown", handleFirstInteraction, pointerOptions);
+      window.removeEventListener("touchstart", handleFirstInteraction, pointerOptions);
+      window.removeEventListener("keydown", handleFirstInteraction, keyOptions);
+    };
+  }, [isPlaying, startMusic]);
+
+  return (
+    <div className="background-music">
+      <audio
+        ref={audioRef}
+        src={BACKGROUND_MUSIC_SRC}
+        loop
+        preload="auto"
+        autoPlay
+        playsInline
+        onPlay={() => {
+          setIsPlaying(true);
+          setShouldShowFallback(false);
+        }}
+        onPause={() => setIsPlaying(false)}
+        onError={() => {
+          setHasAudioError(true);
+          setIsPlaying(false);
+          setShouldShowFallback(true);
+        }}
+      />
+      {shouldShowFallback || hasAudioError ? (
+        <button
+          type="button"
+          className="music-control is-visible"
+          onClick={handleStartMusic}
+          aria-label={hasAudioError ? "Audio gagal dimuat" : "Mulai musik"}
+          disabled={hasAudioError}
+        >
+          <span className="music-control-icon" aria-hidden="true">
+            {hasAudioError ? "!" : ">"}
+          </span>
+          <span>{hasAudioError ? "Audio gagal" : "Mulai musik"}</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function BouquetReveal({ isVisible }) {
+  return (
+    <div
+      className={`bouquet-reveal${isVisible ? " is-visible" : ""}`}
+      role="img"
+      aria-label="Seikat bunga ulang tahun"
+      aria-hidden={!isVisible}
+    >
+      <div className="bouquet-glow" aria-hidden="true" />
+      <div className="bouquet-bundle" aria-hidden="true">
+        <div className="wrapped-bouquets">
+          {BOUQUET_REVEAL_ASSETS.map((bouquet) => (
+            <span key={bouquet.id} className={`wrapped-bouquet wrapped-bouquet-${bouquet.id}`}>
+              <img className="wrapped-bouquet-image" src={bouquet.src} alt={bouquet.label} draggable="false" />
+            </span>
+          ))}
+        </div>
+        <span className="bouquet-petal bouquet-petal-a" />
+        <span className="bouquet-petal bouquet-petal-b" />
+        <span className="bouquet-petal bouquet-petal-c" />
+        <span className="bouquet-petal bouquet-petal-d" />
+        <span className="bouquet-sparkle bouquet-sparkle-a" />
+        <span className="bouquet-sparkle bouquet-sparkle-b" />
+        <span className="bouquet-sparkle bouquet-sparkle-c" />
+      </div>
+    </div>
   );
 }
 
@@ -353,18 +493,28 @@ function EnvelopeFeature({ isOpen, isCandleBlown, closeNotice, onOpen, onClose, 
 
           <article className="letter-sheet" aria-label="Isi surat ucapan">
             <div className="letter-paper" ref={letterPaperRef}>
-              <p className="letter-kicker">Special Note</p>
-              <h2>Untukmu yang sedang berbahagia,</h2>
               <p>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus, velit non
-                viverra feugiat, sem justo ultricies metus, at varius augue ipsum nec risus.
+                How was your day lindaa?. kulihat kamu selalu ceria, kuharap kamu selalu bahagia
+                sebagaimana yang kulihat. Aku tau kecil kemungkinan bahkan mustahil untuk kita
+                bersama lagi, tapi aku yakin di dunia lain ada kita yang bersama. aku mengirim pesan
+                ini sama sekali tidak bermaksud melukai dan menggangumu lagi, aku hanya ingin orang
+                yang pernah ku cinta baik baik saja dan bisa selalu bahagia tanpaku.
               </p>
               <p>
-                Phasellus sit amet eros vitae lorem sollicitudin rhoncus. Curabitur vehicula nibh
-                ac arcu aliquet, non placerat justo feugiat. Integer fermentum, augue id aliquet
-                interdum, magna sapien mattis nunc, sit amet ultrices mauris mi vitae urna.
+                walau yang kulihat kamu selalu tampak bahagia tapi pasti kamu ada masalah
+                tersembunyi yang sedang kamu selesaikan, kalau kamu butuh bantuan kamu masih bisa
+                minta tolong ke aku lindaa. disini aku selalu mendoakan yang terbaik untukmu lindaa.
               </p>
-              <p className="letter-signoff">Dengan hangat,<br />Someone who cares</p>
+              <p>
+                oh ya btw aku lihat postingan ulang atau story kamu linda dan ntah kenapa hati ini
+                selalu denial dan menganggap itu untuk aku, padahal tentunya itu bukan untukku tapi
+                pria barumu😞.
+              </p>
+              <p>🎂🥳Happy birthday to the person I still hope will come back again.🎉</p>
+              <p>
+                maaf hanya bisa memberimu bunga dan kue virtual, aku hanya pria miskin yang dulu tak
+                sempat membalas kebaikanmu dihari ulang tahunmu😞.
+              </p>
             </div>
           </article>
 
