@@ -338,7 +338,7 @@ function BouquetModelCanvas({ isVisible, modelSrc }) {
       controls.enablePan = false;
       controls.enableZoom = false;
       controls.rotateSpeed = 0.72;
-      controls.autoRotateSpeed = -2.0;
+      controls.autoRotateSpeed = -4.0;
       controls.minPolarAngle = Math.PI * 0.08;
       controls.maxPolarAngle = Math.PI * 0.92;
       frameObject(THREE, placeholderBouquet, camera, controls);
