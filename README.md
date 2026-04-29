@@ -85,4 +85,4 @@ Kembang api berjalan terus-menerus di background untuk menambah suasana perayaan
 - Isi surat masih dummy text dan bisa diganti kapan saja.
 - Teks LED saat ini disusun dari font dot-matrix custom sederhana di `src/App.jsx`.
 - Semua animasi utama dibuat dengan CSS dan state React ringan.
-- Asset buket memakai `microsoft/fluentui-emoji` Bouquet 3D berlisensi MIT; notice lisensinya disimpan di `public/assets/fluentui-emoji-LICENSE.txt`.
+- Asset buket 3D custom disimpan di `public/assets/flower_bouquet.glb` dan dirender interaktif dengan Three.js.

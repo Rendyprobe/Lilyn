@@ -20,11 +20,7 @@ const LED_MESSAGES = ["HAPPY BIRTHDAY", "LINDA", "PUTRI", "RAHAYU"];
 const LED_GLYPH_SPACING = 2;
 const MAX_LED_COLUMNS = Math.max(...LED_MESSAGES.map(getMessageColumns));
 const BACKGROUND_MUSIC_SRC = `${import.meta.env.BASE_URL}audio/about-you.mp3`;
-const BOUQUET_REVEAL_ASSETS = [
-  { id: "left", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga kiri" },
-  { id: "center", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga tengah" },
-  { id: "right", src: `${import.meta.env.BASE_URL}assets/bouquet-3d.png`, label: "Buket bunga kanan" },
-];
+const BOUQUET_MODEL_SRC = `${import.meta.env.BASE_URL}assets/flower_bouquet.glb`;
 const FIREWORKS = [
   { id: "fw-a", left: "12%", top: "18%", size: "11rem", hue: 128, delay: "0s", duration: "4.8s" },
   { id: "fw-b", left: "26%", top: "10%", size: "9rem", hue: 188, delay: "1.3s", duration: "4.2s" },
@@ -228,13 +224,7 @@ function BouquetReveal({ isVisible }) {
     >
       <div className="bouquet-glow" aria-hidden="true" />
       <div className="bouquet-bundle" aria-hidden="true">
-        <div className="wrapped-bouquets">
-          {BOUQUET_REVEAL_ASSETS.map((bouquet) => (
-            <span key={bouquet.id} className={`wrapped-bouquet wrapped-bouquet-${bouquet.id}`}>
-              <img className="wrapped-bouquet-image" src={bouquet.src} alt={bouquet.label} draggable="false" />
-            </span>
-          ))}
-        </div>
+        <BouquetModelCanvas isVisible={isVisible} modelSrc={BOUQUET_MODEL_SRC} />
         <span className="bouquet-petal bouquet-petal-a" />
         <span className="bouquet-petal bouquet-petal-b" />
         <span className="bouquet-petal bouquet-petal-c" />
@@ -245,6 +235,401 @@ function BouquetReveal({ isVisible }) {
       </div>
     </div>
   );
+}
+
+function BouquetModelCanvas({ isVisible, modelSrc }) {
+  const mountRef = useRef(null);
+  const isVisibleRef = useRef(isVisible);
+  const [isDragging, setIsDragging] = useState(false);
+  const [modelStatus, setModelStatus] = useState("idle");
+
+  useEffect(() => {
+    isVisibleRef.current = isVisible;
+
+    if (!isVisible) {
+      setIsDragging(false);
+      setModelStatus("idle");
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+
+    if (!mount || !isVisible) {
+      return undefined;
+    }
+
+    let isDisposed = false;
+    let cleanupScene = () => {};
+
+    setModelStatus("loading");
+
+    const setupScene = async () => {
+      const [THREE, { OrbitControls }, { GLTFLoader }] = await Promise.all([
+        import("three"),
+        import("three/examples/jsm/controls/OrbitControls.js"),
+        import("three/examples/jsm/loaders/GLTFLoader.js"),
+      ]);
+
+      if (isDisposed || !mountRef.current) {
+        return;
+      }
+
+      const activeMount = mountRef.current;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(34, 1, 0.01, 100);
+      const renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: import.meta.env.DEV,
+      });
+      const clock = new THREE.Clock();
+      let frameId = 0;
+      let mixer = null;
+      const interaction = { active: false, resumeAt: 0 };
+      const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      activeMount.dataset.model = "loading";
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      renderer.domElement.className = "bouquet-model-canvas";
+      renderer.domElement.setAttribute("aria-hidden", "true");
+      activeMount.appendChild(renderer.domElement);
+
+      const hemisphereLight = new THREE.HemisphereLight(0xfffbf0, 0x3f4b69, 2.3);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
+      const rimLight = new THREE.DirectionalLight(0xff8eb0, 1.45);
+      const fillLight = new THREE.DirectionalLight(0xa7e7ff, 1.1);
+
+      keyLight.position.set(-2.5, 4, 3.5);
+      rimLight.position.set(3, 2.4, -2.5);
+      fillLight.position.set(0.6, 1.8, 4);
+      scene.add(hemisphereLight, keyLight, rimLight, fillLight);
+
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(1.35, 64),
+        new THREE.MeshBasicMaterial({
+          color: 0x000000,
+          transparent: true,
+          opacity: 0.16,
+          depthWrite: false,
+        }),
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = -0.015;
+      scene.add(shadow);
+
+      const bouquetRoot = new THREE.Group();
+      bouquetRoot.rotation.y = -0.22;
+      scene.add(bouquetRoot);
+
+      const placeholderBouquet = createFallbackBouquet(THREE);
+      placeholderBouquet.visible = false;
+      bouquetRoot.add(placeholderBouquet);
+      normalizeObjectToHeight(THREE, placeholderBouquet, 3.1);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.enablePan = false;
+      controls.enableZoom = false;
+      controls.rotateSpeed = 0.72;
+      controls.autoRotateSpeed = -2.0;
+      controls.minPolarAngle = Math.PI * 0.08;
+      controls.maxPolarAngle = Math.PI * 0.92;
+      frameObject(THREE, placeholderBouquet, camera, controls);
+
+      controls.addEventListener("start", () => {
+        interaction.active = true;
+        controls.autoRotate = false;
+
+        if (!isDisposed) {
+          setIsDragging(true);
+        }
+      });
+      controls.addEventListener("end", () => {
+        interaction.active = false;
+        interaction.resumeAt = performance.now() + 1200;
+
+        if (!isDisposed) {
+          setIsDragging(false);
+        }
+      });
+
+      const resizeRenderer = () => {
+        const nextWidth = Math.max(1, Math.floor(activeMount.clientWidth));
+        const nextHeight = Math.max(1, Math.floor(activeMount.clientHeight));
+
+        renderer.setSize(nextWidth, nextHeight, false);
+        camera.aspect = nextWidth / nextHeight;
+        camera.updateProjectionMatrix();
+      };
+
+      const resizeObserver = new ResizeObserver(resizeRenderer);
+      resizeObserver.observe(activeMount);
+      resizeRenderer();
+
+      const loader = new GLTFLoader();
+      loader.load(
+        modelSrc,
+        (gltf) => {
+          if (isDisposed) {
+            return;
+          }
+
+          bouquetRoot.remove(placeholderBouquet);
+          disposeThreeObject(placeholderBouquet);
+          const customBouquet = gltf.scene;
+          bouquetRoot.add(customBouquet);
+          normalizeObjectToHeight(THREE, customBouquet, 3.25);
+          frameObject(THREE, customBouquet, camera, controls);
+          activeMount.dataset.model = "custom";
+          setModelStatus("custom");
+
+          if (gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(customBouquet);
+            gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+          }
+        },
+        undefined,
+        () => {
+          placeholderBouquet.visible = true;
+          activeMount.dataset.model = "fallback";
+          setModelStatus("fallback");
+          frameObject(THREE, placeholderBouquet, camera, controls);
+        },
+      );
+
+      const animate = (timestamp = 0) => {
+        if (isDisposed) {
+          return;
+        }
+
+        const shouldAutoRotate =
+          isVisibleRef.current &&
+          !interaction.active &&
+          timestamp > interaction.resumeAt &&
+          !reducedMotionQuery.matches;
+
+        controls.autoRotate = shouldAutoRotate;
+        const delta = clock.getDelta();
+
+        if (mixer && isVisibleRef.current) {
+          mixer.update(delta);
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+        frameId = window.requestAnimationFrame(animate);
+      };
+
+      frameId = window.requestAnimationFrame(animate);
+
+      cleanupScene = () => {
+        isDisposed = true;
+        window.cancelAnimationFrame(frameId);
+        resizeObserver.disconnect();
+        controls.dispose();
+        mixer?.stopAllAction();
+        disposeThreeObject(scene);
+        renderer.renderLists.dispose();
+        renderer.dispose();
+
+        if (renderer.domElement.parentNode === activeMount) {
+          activeMount.removeChild(renderer.domElement);
+        }
+
+        delete activeMount.dataset.model;
+      };
+    };
+
+    void setupScene();
+
+    return () => {
+      isDisposed = true;
+      cleanupScene();
+    };
+  }, [isVisible, modelSrc]);
+
+  return (
+    <div
+      ref={mountRef}
+      className={`bouquet-model-shell${isDragging ? " is-dragging" : ""}`}
+    >
+      {modelStatus === "loading" ? (
+        <p className="bouquet-loading" role="status" aria-live="polite">
+          tunggu yaa, bunga sedang disiapkan🙏🏻
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function createFallbackBouquet(THREE) {
+  const bouquet = new THREE.Group();
+  const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x3e8d5b, roughness: 0.58 });
+  const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x58ad68, roughness: 0.64 });
+  const wrapMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffd9e3,
+    roughness: 0.78,
+    side: THREE.DoubleSide,
+  });
+  const wrapAccentMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff95b2,
+    roughness: 0.72,
+    side: THREE.DoubleSide,
+  });
+  const tieMaterial = new THREE.MeshStandardMaterial({ color: 0xd84f7f, roughness: 0.48 });
+  const stemBase = new THREE.Vector3(0, 0.46, 0);
+  const bloomSpecs = [
+    { position: new THREE.Vector3(-0.48, 2.32, 0), color: 0xff6f9f, scale: 1 },
+    { position: new THREE.Vector3(0.02, 2.54, 0.08), color: 0xffd166, scale: 1.08 },
+    { position: new THREE.Vector3(0.46, 2.28, -0.02), color: 0xf15bb5, scale: 0.98 },
+    { position: new THREE.Vector3(-0.16, 2.08, 0.2), color: 0x9bdeac, scale: 0.88 },
+    { position: new THREE.Vector3(0.22, 2.02, -0.16), color: 0xff8fab, scale: 0.9 },
+  ];
+
+  bloomSpecs.forEach((bloom, index) => {
+    const stemEnd = bloom.position.clone().add(new THREE.Vector3(0, -0.2, 0));
+    const stem = createStemBetween(THREE, stemBase, stemEnd, 0.022, stemMaterial);
+    bouquet.add(stem);
+
+    if (index < 4) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 10), leafMaterial);
+      leaf.scale.set(1.4, 0.38, 0.58);
+      leaf.position.copy(stemBase).lerp(stemEnd, 0.52);
+      leaf.rotation.set(0.35, index * 0.72, index % 2 === 0 ? -0.75 : 0.75);
+      bouquet.add(leaf);
+    }
+
+    const bloomHead = createFallbackBloom(THREE, bloom.color);
+    bloomHead.position.copy(bloom.position);
+    bloomHead.rotation.set(-0.08, index * 0.62, 0.06);
+    bloomHead.scale.multiplyScalar(bloom.scale);
+    bouquet.add(bloomHead);
+  });
+
+  const wrapBack = new THREE.Mesh(new THREE.ConeGeometry(0.82, 1.5, 5, 1, true), wrapMaterial);
+  wrapBack.position.set(0, 0.78, -0.06);
+  wrapBack.rotation.set(Math.PI, Math.PI * 0.1, 0);
+  wrapBack.scale.set(1.04, 1, 0.36);
+  bouquet.add(wrapBack);
+
+  const wrapFront = new THREE.Mesh(new THREE.ConeGeometry(0.74, 1.28, 5, 1, true), wrapAccentMaterial);
+  wrapFront.position.set(0, 0.63, 0.15);
+  wrapFront.rotation.set(Math.PI, -Math.PI * 0.04, 0);
+  wrapFront.scale.set(0.9, 1, 0.25);
+  bouquet.add(wrapFront);
+
+  const tie = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 12, 42), tieMaterial);
+  tie.position.set(0, 0.56, 0.23);
+  tie.rotation.x = Math.PI / 2;
+  tie.scale.set(1, 0.42, 0.24);
+  bouquet.add(tie);
+
+  return bouquet;
+}
+
+function createFallbackBloom(THREE, petalColor) {
+  const bloom = new THREE.Group();
+  const petalMaterial = new THREE.MeshStandardMaterial({ color: petalColor, roughness: 0.48 });
+  const centerMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0a3, roughness: 0.35 });
+  const petalGeometry = new THREE.SphereGeometry(0.14, 18, 12);
+
+  Array.from({ length: 7 }).forEach((_, index) => {
+    const angle = (index / 7) * Math.PI * 2;
+    const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+
+    petal.position.set(Math.cos(angle) * 0.14, Math.sin(angle) * 0.12, 0);
+    petal.rotation.z = angle;
+    petal.scale.set(1.08, 0.7, 0.4);
+    bloom.add(petal);
+  });
+
+  const center = new THREE.Mesh(new THREE.SphereGeometry(0.09, 18, 12), centerMaterial);
+  center.position.z = 0.045;
+  bloom.add(center);
+  bloom.scale.setScalar(1.18);
+
+  return bloom;
+}
+
+function createStemBetween(THREE, start, end, radius, material) {
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 10), material);
+
+  stem.position.copy(start).add(end).multiplyScalar(0.5);
+  stem.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+
+  return stem;
+}
+
+function normalizeObjectToHeight(THREE, object, targetHeight) {
+  object.updateMatrixWorld(true);
+  const initialBox = new THREE.Box3().setFromObject(object);
+  const initialSize = initialBox.getSize(new THREE.Vector3());
+  const initialMaxAxis = Math.max(initialSize.x, initialSize.y, initialSize.z);
+
+  if (!Number.isFinite(initialMaxAxis) || initialMaxAxis === 0) {
+    return;
+  }
+
+  object.scale.multiplyScalar(targetHeight / initialMaxAxis);
+  object.updateMatrixWorld(true);
+
+  const centeredBox = new THREE.Box3().setFromObject(object);
+  const center = centeredBox.getCenter(new THREE.Vector3());
+  object.position.sub(center);
+  object.updateMatrixWorld(true);
+
+  const groundedBox = new THREE.Box3().setFromObject(object);
+  object.position.y -= groundedBox.min.y;
+  object.updateMatrixWorld(true);
+}
+
+function frameObject(THREE, object, camera, controls) {
+  object.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z, 1);
+  const distance = (maxDimension / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))) * 1.34;
+
+  controls.target.set(center.x, center.y + size.y * 0.06, center.z);
+  camera.near = Math.max(0.01, distance / 100);
+  camera.far = distance * 100;
+  camera.position.set(center.x + maxDimension * 0.12, center.y + size.y * 0.08, center.z + distance);
+  camera.updateProjectionMatrix();
+  controls.minDistance = distance * 0.72;
+  controls.maxDistance = distance * 1.7;
+  controls.update();
+}
+
+function disposeThreeObject(object) {
+  object.traverse?.((child) => {
+    child.geometry?.dispose();
+
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+    materials.forEach((material) => {
+      if (!material) {
+        return;
+      }
+
+      Object.values(material).forEach((value) => {
+        if (value?.isTexture) {
+          value.dispose();
+        }
+      });
+
+      material.dispose?.();
+    });
+  });
 }
 
 function FireworksBackdrop() {

@@ -1591,6 +1591,7 @@ body::after {
 
 .bouquet-reveal.is-visible {
   opacity: 1;
+  pointer-events: auto;
   transform: translate(-50%, 0) scale(1);
   transition-delay: 260ms;
 }
@@ -1620,35 +1621,32 @@ body::after {
   animation: bouquet-settle 1.12s cubic-bezier(0.18, 1.18, 0.18, 1) both;
 }
 
-.wrapped-bouquets {
+.bouquet-model-shell {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: -0.25rem;
   z-index: 4;
-}
-
-.wrapped-bouquet {
-  position: absolute;
-  left: var(--bouquet-left);
-  bottom: var(--bouquet-bottom);
-  z-index: var(--bouquet-depth);
-  display: grid;
-  place-items: end center;
-  width: var(--bouquet-size);
+  width: min(96vw, 31rem);
+  height: min(82vh, 31rem);
+  min-height: 18rem;
   opacity: 0;
-  transform: translateX(-50%) translateY(2rem) rotate(var(--bouquet-rotate)) scale(0.76);
+  cursor: grab;
+  pointer-events: none;
+  touch-action: none;
+  transform: translateX(-50%) translateY(2rem) scale(0.78);
   transform-origin: center bottom;
   filter:
-    drop-shadow(0 1.55rem 1.35rem rgba(0, 0, 0, 0.24))
-    drop-shadow(0 0 1rem rgba(255, 172, 188, 0.16));
+    drop-shadow(0 1.65rem 1.45rem rgba(0, 0, 0, 0.24))
+    drop-shadow(0 0 1rem rgba(255, 172, 188, 0.18));
 }
 
-.wrapped-bouquet::after {
+.bouquet-model-shell::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 0.4rem;
+  bottom: 0.2rem;
   z-index: -1;
-  width: 62%;
+  width: 58%;
   height: 1.65rem;
   transform: translateX(-50%);
   border-radius: 50%;
@@ -1657,43 +1655,50 @@ body::after {
   opacity: 0.78;
 }
 
-.bouquet-reveal.is-visible .wrapped-bouquet {
-  animation: wrapped-bouquet-rise 820ms cubic-bezier(0.18, 1.22, 0.24, 1) forwards;
-  animation-delay: var(--bouquet-delay);
+.bouquet-model-shell.is-dragging {
+  cursor: grabbing;
 }
 
-.wrapped-bouquet-image {
+.bouquet-model-canvas {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  outline: none;
   user-select: none;
 }
 
-.wrapped-bouquet-left {
-  --bouquet-left: 26%;
-  --bouquet-bottom: 0.15rem;
-  --bouquet-size: min(76vw, 25.6rem);
-  --bouquet-depth: 4;
-  --bouquet-delay: 120ms;
-  --bouquet-rotate: -10deg;
+.bouquet-loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 8;
+  width: min(88vw, 18rem);
+  margin: 0;
+  padding: 0.76rem 0.9rem;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 230, 238, 0.3);
+  border-radius: 999px;
+  background: rgba(16, 22, 28, 0.72);
+  box-shadow:
+    0 1rem 2rem rgba(0, 0, 0, 0.28),
+    inset 0 0 0.85rem rgba(255, 190, 210, 0.12);
+  color: rgba(255, 244, 248, 0.96);
+  font-size: clamp(0.82rem, 2.8vw, 0.98rem);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 0 0.8rem rgba(255, 154, 190, 0.45);
+  pointer-events: none;
 }
 
-.wrapped-bouquet-center {
-  --bouquet-left: 50%;
-  --bouquet-bottom: 0.55rem;
-  --bouquet-size: min(96vw, 32.4rem);
-  --bouquet-depth: 7;
-  --bouquet-delay: 40ms;
-  --bouquet-rotate: 0deg;
+.bouquet-model-shell[data-model="custom"] .bouquet-loading,
+.bouquet-model-shell[data-model="fallback"] .bouquet-loading {
+  display: none;
 }
 
-.wrapped-bouquet-right {
-  --bouquet-left: 74%;
-  --bouquet-bottom: 0.05rem;
-  --bouquet-size: min(76vw, 25.6rem);
-  --bouquet-depth: 4;
-  --bouquet-delay: 200ms;
-  --bouquet-rotate: 10deg;
+.bouquet-reveal.is-visible .bouquet-model-shell {
+  animation: bouquet-model-rise 840ms cubic-bezier(0.18, 1.22, 0.24, 1) 60ms forwards;
+  pointer-events: auto;
 }
 
 .bouquet-petal,
@@ -2118,20 +2123,20 @@ body::after {
   }
 }
 
-@keyframes wrapped-bouquet-rise {
+@keyframes bouquet-model-rise {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(2rem) rotate(var(--bouquet-rotate)) scale(0.76);
+    transform: translateX(-50%) translateY(2rem) scale(0.78);
   }
 
   64% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-0.32rem) rotate(var(--bouquet-rotate)) scale(1.04);
+    transform: translateX(-50%) translateY(-0.32rem) scale(1.04);
   }
 
   100% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) rotate(var(--bouquet-rotate)) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 }
 
@@ -2342,19 +2347,11 @@ body::after {
     transform: translate(-50%, 0) scale(0.86);
   }
 
-  .wrapped-bouquet-left {
-    --bouquet-left: 27%;
-    --bouquet-size: min(76vw, 18.4rem);
-  }
-
-  .wrapped-bouquet-center {
-    --bouquet-left: 50%;
-    --bouquet-size: min(100vw, 23.6rem);
-  }
-
-  .wrapped-bouquet-right {
-    --bouquet-left: 73%;
-    --bouquet-size: min(76vw, 18.4rem);
+  .bouquet-model-shell {
+    bottom: -0.6rem;
+    width: min(106vw, 24rem);
+    height: min(78vh, 24rem);
+    min-height: 17rem;
   }
 
   .background-music {
